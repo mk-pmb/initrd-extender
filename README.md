@@ -39,18 +39,38 @@ If it's present but not (yet) mounted, `irdex` will
 
 1.  try to mount it. If this fails, skip the device.
 1.  check whether it has an `/irdex-fx` directory. If not, skip the device.
-1.  check whether it has an `/irdex-fx/bin` directory.
-    If so, copy each of the files in it to `/bin` and mark the destination
-    files executable. (This way your source disk can use a file system that
-    does not support the executable bit.)
-1.  check whether it has an `/irdex-fx/extras` directory.
+1.  __(fx:bin)__
+    If there are any files inside directory `/irdex-fx/bin`,
+    copy each of them to `/bin` and mark the destination files executable.
+    (This way your source disk can use a file system that does not support
+    the executable bit.)
+    Some known script filename extensions (e.g. `.sh`, `.py`, `.pl`, `.sed`)
+    are stripped from the destination filename.
+1.  __(fx:bin-arch)__ Same as (fx:bin) but with directory
+    `/irdex-fx/bin-###`, where `###` is the machine architecture reported
+    by `uname -m`, e.g. `/irdex-fx/bin-i686` or `/irdex-fx/bin-x86_64`.
+1.  __(fx:upd)__
+    check whether it has an `/irdex-fx/upd` directory.
     If so, copy all of its contents to `/`.
     No guarantees are given whether hidden items (i.e. whose name starts with
     a dot) are copied.
-1.  check whether it has an `/irdex-fx/autorun.sh` file.
+    Existing destination files will be replaced.
+    In case the destination is a symlink, there's no guarantee whether
+    `irdex` will (try to) replace the symlink itself, or its target.
+1.  __(fx:upd-arch)__ Same as (fx:upd), but using an architecture-specific
+    directory name as in (fx:bin-arch), e.g. `/irdex-fx/upd-x86_64`.
+1.  __(fx:add)__
+    Like (fx:upd) but using the `/irdex-fx/add` directory,
+    and existing destinations are skipped.
+1.  __(fx:add-arch)__ Same as (fx:add), but using an architecture-specific
+    directory name as in (fx:bin-arch), e.g. `/irdex-fx/add-x86_64`.
+1.  __(fx:autorun)__
+    check whether it has an `/irdex-fx/autorun.sh` file.
     If so, it is copied to `/bin/irdex-autorun-###`, where `###` is a name
     derived from the mountpoint name.
-    The resulting file is then marked executable and is executed.
+    The resulting file is then marked executable and is executed,
+    with the environment variable `IRDEX_FXDIR` set to the path of the
+    `irdex-fx` directory the autorun script originated from.
 
 
 Other things that `irdex` will do:
@@ -78,6 +98,8 @@ Set this to a list of devices whose irdex paylods you want to activate.
     * `L` (default): file system label
     * `U`: GPT partition UUID, then file system UUID
     * `N`: GPT partition name
+    * `I`: `/dev/disk/by-id/`
+    * `P`: `/dev/disk/by-path/`
     * anything that starts with a slash (`/`):
       It's added verbatim in front of `<name>` to construct a device path.
       Decide for yourself if you want a slash at the end.

@@ -1,0 +1,1 @@
+etc/initramfs-tools/scripts/local-top/initrd-extender.sh
