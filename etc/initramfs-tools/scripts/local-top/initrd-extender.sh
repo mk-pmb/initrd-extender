@@ -226,9 +226,49 @@ irdex_install_extras () {
   # Options must be crippled for busybox's cp:
   local ITEM=
   for ITEM in "$FXDIR/$SUBDIR"/* "$FXDIR/$SUBDIR-$ARCH"/*; do
-    [ -e "$ITEM" ] || [ -L "$ITEM" ] || continue
-    cp -rpdf $CP_OPT -- "$ITEM" / # busybox needs cripppled options
+    irdex_copy_helper "$ITEM" / || return $?
   done
+}
+
+
+irdex_copy_helper () {
+  local ORIG="$1" DEST="$2"
+  [ -e "$ORIG" ] || [ -L "$ORIG" ] || return 0
+  case "$CP_OPT" in
+    -n ) CP_OPT= irdex_copy_noreplace "$ORIG" "$DEST"; return $?;;
+  esac
+  # busybox cp needs very limited short options
+  cp -rpdf $CP_OPT -- "$ORIG" "$DEST" || return $?
+}
+
+
+irdex_copy_noreplace () {
+  # because busybox's cp doesn't support -n
+  local ORIG="$1" DEST_DIR="$2"
+  ORIG="${ORIG%/}"
+  local BN="$(basename -- "$ORIG")"
+  local DEST="${DEST_DIR%/}/$BN"
+  if [ -L "$DEST" ]; then
+    return 0
+  elif [ -d "$DEST" ]; then
+    [ -L "$ORIG" ] && return 0 # don't replace dir with symlink
+    [ -d "$ORIG" ] || return 0 # don't replace dir with non-dir
+  elif [ -e "$DEST" ]; then
+    return 0 # don't replace existing non-dir target
+  fi
+  if [ -L "$ORIG" ]; then
+    CP_OPT= irdex_copy_helper "$ORIG" "$DEST" || return $?
+  elif [ -d "$ORIG" ]; then
+    mkdir -p -- "$DEST"
+    for ORIG in "$ORIG"/.* "$ORIG"/*; do
+      case "$ORIG" in
+        */. | */.. ) continue;;
+      esac
+      irdex_copy_noreplace "$ORIG" "$DEST" || return $?
+    done
+  else
+    CP_OPT= irdex_copy_helper "$ORIG" "$DEST" || return $?
+  fi
 }
 
 
