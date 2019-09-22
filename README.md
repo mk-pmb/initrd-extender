@@ -33,8 +33,30 @@ How it works
 ------------
 
 The core of initrd-extender is the `irdex` program.
-Several times during initrd startup, it will check a given a list of
-device names for whether each devices is present and mounted.
+Several times during initrd startup, it will:
+
+1. __(unfold)__ Install itself more thoroughly.
+1. __(dyndisks)__ Check a given a list of devices for additional instructions.
+
+
+
+### (unfold)
+
+1.  __(unfold:check_booting)__
+    Check whether irdex is running inside an initramfs.
+    If there's doubt about it, skip the remainder of (unfold).
+    See config for how to skip these checks.
+1.  __(unfold:retrigger)__
+    Add itself to later initramfs script triggers.
+    Done at initramfs time because `update-initramfs` didn't accept my
+    symlinks, and I don't like having a separate hook script.
+
+
+
+### (dyndisks)
+
+The list of devices can be configured via `irdex_disks=`.
+Each devices is checked for whether it's present and mounted.
 If it's present but not (yet) mounted, `irdex` will
 
 1.  try to mount it. If this fails, skip the device.
@@ -84,11 +106,20 @@ Other things that `irdex` will do:
 Configuration
 -------------
 
-This script interprets one kernel parameter:
+Configuration is done via environment variables.
+To set them at initramfs time:
+
+* The intended method is to provide them as kernel parameters.
+* Using `export`ed variables in `/etc/initramfs-tools/conf.d/*` files
+  should work, too.
+  It seems that vars set in those configs will always win over kernel params,
+  but don't rely on it until you find a trusted source that says so.
+
+
 
 ### irdex_disks=
 
-Set this to a list of devices whose irdex paylods you want to activate.
+Set this to a list of devices whose irdex instructions you want to activate.
 
 * List items are separated by comma, space, or any combination thereof.
 * Empty list items are ignored.
@@ -111,6 +142,12 @@ Set this to a list of devices whose irdex paylods you want to activate.
     In case it does not contain slashes, `/mnt/` is inserted in front.
   * `<name>` is the identifier of the disk device within the namespace
     selected by `<criterion>`.
+
+
+### irdex_inside_initramfs=
+
+Set this to `yes_really` to skip the (unfold:check_booting) checks.
+
 
 
 

@@ -5,6 +5,7 @@
 irdex_main () {
   export LANG=en_US.UTF-8  # make error messages search engine-friendly
   export LANGUAGE="$LANG"
+  local ORIG_ARG_ZERO="$0"
   local SELFFILE="$(readlink -f -- "$0")"
   local ACTION="$1"
   [ -n "$ACTION" ] || ACTION='boot'
@@ -29,13 +30,49 @@ irdex_log () {
 
 
 irdex_boot () {
-  irdex_symlink_self_to_bin
+  irdex_unfold
   irdex_scan || return $?
 }
 
 
-irdex_symlink_self_to_bin () {
-  local DEST='/bin/irdex'
+irdex_unfold () {
+  ( echo '$0='"$ORIG_ARG_ZERO"
+    env | sort # beware the restricted options, e.g. no -V
+  ) >"/tmp/irdex_unfold.debug.$(date +%y%m%d-%H%M%S).$$.txt" 2>&1
+
+  if irdex_unfold_check_booting; then
+    irdex_log D "Looks like we're running inside an initramfs. Unfold!"
+  else
+    irdex_log D "We're probably not inside an initramfs. Will not unfold."
+    return 0
+  fi
+
+  irdex_symlink_self_to /bin/irdex
+  irdex_symlink_self_to /scripts/local-premount/
+  irdex_symlink_self_to /scripts/local-block/
+}
+
+
+irdex_unfold_check_booting () {
+  [ "$irdex_inside_initramfs" = 'yes_really' ] && return 0
+  case "$PS1" in
+    '' ) ;; # probably script-triggered
+    '(initramfs) '* ) ;; # probably running inside rescue shell
+    * ) return 2;;
+  esac
+  [ "$rootmnt" = '/root' ] || return 2
+  case "$SELFFILE" in
+    /scripts/local-* ) ;;
+    * ) return 2;;
+  esac
+}
+
+
+irdex_symlink_self_to () {
+  local DEST="$1"
+  case "$DEST" in
+    */ ) DEST="$DEST/$(basename -- "$SELFFILE")";;
+  esac
   [ -f "$DEST" ] && return 0
   ln -s -- "$SELFFILE" "$DEST" || return $?$(
     irdex_log W "failed to create symlink '$DEST' to '$SELFFILE'")
@@ -233,12 +270,17 @@ irdex_install_extras () {
 
 irdex_copy_helper () {
   local ORIG="$1" DEST="$2"
+  ORIG="${ORIG%/}"
   [ -e "$ORIG" ] || [ -L "$ORIG" ] || return 0
   case "$CP_OPT" in
     -n ) CP_OPT= irdex_copy_noreplace "$ORIG" "$DEST"; return $?;;
+    '' ) ;;
+    * )
+      echo "E: unsupported CP_OPT for irdex_copy_helper: '$CP_OPT'" >&2
+      return 8;;
   esac
   # busybox cp needs very limited short options
-  cp -rpdf $CP_OPT -- "$ORIG" "$DEST" || return $?
+  cp -rpdf -- "$ORIG" "$DEST" || return $?
 }
 
 
