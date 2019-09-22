@@ -137,9 +137,14 @@ irdex_parse_one_disk_spec () {
 
 
 irdex_ismnt () {
-  local MNTP="$1"
+  local DISK="$1"; shift
+  local MNTP="$1"; shift
   MNTP="${MNTP%/}"
-  mount | cut -d ' ' -f 2-4 | grep -qxFe "on $MNTP type"
+  if [ -n "$DISK" ]; then
+    # check strictly
+    mount | cut -d ' ' -f 1-4 | grep -qxFe "$DISK on $MNTP type"; return $?
+  fi
+  mount | cut -d ' ' -f 2-4 | grep -qxFe "on $MNTP type"; return $?
 }
 
 
@@ -154,13 +159,19 @@ irdex_actually_mount () {
 
 irdex_mount_extend_disk () {
   if [ ! -b "$DISK_DEV" ]; then
-    irdex_log D "Not (yet) a block device: $DISK_DEV ($NICK)"
+    if irdex_ismnt "$DISK_DEV" "$MNTP"; then
+      irdex_log W "umount $MNTP because $DISK_DEV ($NICK)" \
+        "is no longer a block device."
+      umount "$MNTP" || return $?
+      return 0
+    fi
+    irdex_log D "not (yet/again) a block device: $DISK_DEV ($NICK)"
     return 0
   fi
   mkdir -p -- "$MNTP" || return $?$(
     irdex_log E "failed to create mountpoint $MNPT for $DISK_DEV")
   local FXDIR="$MNTP/irdex-fx"
-  if irdex_ismnt "$MNTP"; then
+  if irdex_ismnt '' "$MNTP"; then
     irdex_log D "Something is already mounted in $MNTP."
     return 0
   else
