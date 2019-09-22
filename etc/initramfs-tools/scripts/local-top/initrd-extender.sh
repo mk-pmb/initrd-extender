@@ -189,7 +189,7 @@ irdex_mount_extend_disk () {
   local ARCH="$(uname -m)" # -p = CPU type was unknown in dvalin @2019-09-21
   irdex_install_progs || return $?
   irdex_install_extras '' upd || return $?
-  irdex_install_extras n  add || return $?
+  irdex_install_extras -n add || return $?
   irdex_autorun || return $?
 }
 
