@@ -35,36 +35,60 @@ irdex_boot () {
 }
 
 
-irdex_unfold () {
-  ( echo '$0='"$ORIG_ARG_ZERO"
-    env | sort # beware the restricted options, e.g. no -V
-  ) >"/tmp/irdex_unfold.debug.$(date +%y%m%d-%H%M%S).$$.txt" 2>&1
-
-  if irdex_unfold_check_booting; then
-    irdex_log D "Looks like we're running inside an initramfs. Unfold!"
-  else
-    irdex_log D "We're probably not inside an initramfs. Will not unfold."
-    return 0
-  fi
-
-  irdex_symlink_self_to /bin/irdex
-  irdex_symlink_self_to /scripts/local-premount/
-  irdex_symlink_self_to /scripts/local-block/
+irdex_chapter_cmd () {
+  echo
+  echo "=== $* ==="
+  eval "$*"
 }
 
 
-irdex_unfold_check_booting () {
+irdex_unfold () {
+  irdex_symlink_self_to /bin/irdex
+
+  local WHY_NOT_IRFS="$(irdex_unfold_why_not_inside_initramfs)"
+  ( echo "invoked as: '$ORIG_ARG_ZERO'"
+    echo "our local PS1 (might differ from env): '$PS1'"
+    echo "why not initramfs: '$WHY_NOT_IRFS'"
+    irdex_chapter_cmd 'env | sort'
+    # ^-- sort: beware the restricted options, e.g. no -V
+    irdex_chapter_cmd mount
+  ) >"/tmp/irdex_unfold.debug.$(date +%y%m%d-%H%M%S).$$.txt" 2>&1
+
+  if [ -n "$WHY_NOT_IRFS" ]; then
+    irdex_log D "Will not unfold: We're probably not inside an initramfs:" \
+      "$WHY_NOT_IRFS"
+    return 0
+  fi
+  irdex_log D "Looks like we're running inside an initramfs. Unfold!"
+
+  local TRIG=
+  for TRIG in premount block; do
+    cp -- "$SELFFILE" "/scripts/local-$TRIG/"
+    # a mere symlink seems to be ignored at boot time, too.
+  done
+}
+
+
+irdex_unfold_why_not_inside_initramfs () {
   [ "$irdex_inside_initramfs" = 'yes_really' ] && return 0
+  local WHY_NOT=
   case "$PS1" in
+    '# ' | \
     '' ) ;; # probably script-triggered
     '(initramfs) '* ) ;; # probably running inside rescue shell
-    * ) return 2;;
+    * ) WHY_NOT="$WHY_NOT,ps1";;
   esac
-  [ "$rootmnt" = '/root' ] || return 2
+  mount | cut -d ' ' -sf 1-5 | grep -qxFe 'rootfs on / type rootfs' \
+    || WHY_NOT="$WHY_NOT,rootfs"
+  [ "$rootmnt" = '/root' ] || WHY_NOT="$WHY_NOT,rootmnt"
   case "$SELFFILE" in
     /scripts/local-* ) ;;
-    * ) return 2;;
+    * ) WHY_NOT="$WHY_NOT,selfpath";;
   esac
+  WHY_NOT="${WHY_NOT#,}"
+  [ -n "$WHY_NOT" ] || return 0
+  echo "$WHY_NOT"
+  return 2
 }
 
 

@@ -50,6 +50,8 @@ Several times during initrd startup, it will:
     Add itself to later initramfs script triggers.
     Done at initramfs time because `update-initramfs` didn't accept my
     symlinks, and I don't like having a separate hook script.
+    * :bug: Figure out how to make this work. Neither symlinks nor actual
+      copies of the file seem to re-trigger.
 
 
 
