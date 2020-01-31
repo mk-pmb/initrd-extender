@@ -3,13 +3,37 @@
 
 
 irdex_main () {
+  local ACTION="$1"
+  [ -n "$ACTION" ] || ACTION='boot'
+  [ "$#" = 0 ] || shift
+
   export LANG=en_US.UTF-8  # make error messages search engine-friendly
   export LANGUAGE="$LANG"
   local ORIG_ARG_ZERO="$0"
   local SELFFILE="$(readlink -f -- "$0")"
-  local ACTION="$1"
-  [ -n "$ACTION" ] || ACTION='boot'
-  [ "$#" = 0 ] || shift
+  local SELF_IRD_SCRIPT="$(echo "$0" | sed -nre '
+    s~^/scripts/([a-z]+(-[a-z]+|)/[a-z-]+\.sh)$~\1~p')"
+  local SELF_IRD_PHASE="${SELF_IRD_SCRIPT#/scripts/}"
+
+  local BOOT_PHASE="$IRDEX_BOOT_PHASE"
+  [ -n "$BOOT_PHASE" ] || BOOT_PHASE="$SELF_IRD_PHASE"
+  [ -n "$BOOT_PHASE" ] || BOOT_PHASE='__unknown__'
+
+  local SCRIPT_PHASES="$(echo $(echo '
+    # ./util/find_script_phases.sh
+    # NB: if an nfs stage is used, its local twin will be skipped.
+    init-top
+    init-premount
+    nfs-top
+    local-top
+    local-block
+    nfs-premount
+    local-premount
+    nfs-bottom
+    local-bottom
+    init-bottom
+    ' | sed -nre 's~^\s+~~;/^[a-z-]+$/p'))"
+
   irdex_"$ACTION" "$@"; return $?
 }
 
@@ -46,7 +70,8 @@ irdex_unfold () {
   irdex_symlink_self_to /bin/irdex
 
   local WHY_NOT_IRFS="$(irdex_unfold_why_not_inside_initramfs)"
-  ( echo "invoked as: '$ORIG_ARG_ZERO'"
+  ( echo "invoked as '$ORIG_ARG_ZERO'" \
+      "in phase '$BOOT_PHASE' ('$IRDEX_BOOT_PHASE')"
     echo "our local PS1 (might differ from env): '$PS1'"
     echo "why not initramfs: '$WHY_NOT_IRFS'"
     irdex_chapter_cmd 'env | sort'
@@ -61,11 +86,7 @@ irdex_unfold () {
   fi
   irdex_log D "Looks like we're running inside an initramfs. Unfold!"
 
-  local TRIG=
-  for TRIG in premount block; do
-    cp -- "$SELFFILE" "/scripts/local-$TRIG/"
-    # a mere symlink seems to be ignored at boot time, too.
-  done
+  irdex_ensure_order_triggers || return $?
 }
 
 
@@ -81,10 +102,7 @@ irdex_unfold_why_not_inside_initramfs () {
   mount | cut -d ' ' -sf 1-5 | grep -qxFe 'rootfs on / type rootfs' \
     || WHY_NOT="$WHY_NOT,rootfs"
   [ "$rootmnt" = '/root' ] || WHY_NOT="$WHY_NOT,rootmnt"
-  case "$SELFFILE" in
-    /scripts/local-* ) ;;
-    * ) WHY_NOT="$WHY_NOT,selfpath";;
-  esac
+  [ -n "$SELF_IRD_SCRIPT" ] || WHY_NOT="$WHY_NOT,selfpath"
   WHY_NOT="${WHY_NOT#,}"
   [ -n "$WHY_NOT" ] || return 0
   echo "$WHY_NOT"
@@ -100,6 +118,18 @@ irdex_symlink_self_to () {
   [ -f "$DEST" ] && return 0
   ln -s -- "$SELFFILE" "$DEST" || return $?$(
     irdex_log W "failed to create symlink '$DEST' to '$SELFFILE'")
+}
+
+
+irdex_ensure_order_triggers () {
+  local ADD_TRIG= ORDER_FILE=
+  for ADD_TRIG in $SCRIPT_PHASES; do
+    [ "$ADD_TRIG" == "$SELF_IRD_PHASE" ] && continue
+    ORDER_FILE="/scripts/$ADD_TRIG/ORDER"
+    grep -qFe "${SELF_IRD_SCRIPT} " -- "$ORDER_FILE" && continue
+    sed -re "1i IRDEX_BOOT_PHASE=$ADD_TRIG $SELF_IRD_SCRIPT"' "$@"' \
+      -i -- "$ORDER_FILE" || return $?
+  done
 }
 
 

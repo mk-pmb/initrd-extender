@@ -1,1 +1,1 @@
-../etc/initramfs-tools/scripts/local-top/initrd-extender.sh
+../etc/initramfs-tools/scripts/init-top/initrd-extender.sh
