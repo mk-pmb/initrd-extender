@@ -181,9 +181,14 @@ lcbn () { basename -- "$1" | tr A-Z a-z; }
 irdex_parse_one_disk_spec () {
   local SPEC="$1"; shift
   local ACTION="$1"; shift
+  [ -n "$SPEC" ] || return 0
   local DISK_NS='L' MNTP= NICK=
   case "$SPEC" in
-    '' ) return 0;;
+    upper:* )
+      # Help me configure hostname-based FAT labels in GRUB
+      SPEC="${SPEC#*:}"; SPEC="${SPEC^^}";;
+  esac
+  case "$SPEC" in
     [LUNIP]:* | /*:* ) DISK_NS="${SPEC%%:*}"; SPEC="${SPEC#*:}";;
   esac
   case "$SPEC" in
