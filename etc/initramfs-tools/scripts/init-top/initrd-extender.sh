@@ -185,7 +185,8 @@ irdex_parse_one_disk_spec () {
   local DISK_NS='L' MNTP= NICK=
   case "$SPEC" in
     upper:* )
-      # Help me configure hostname-based FAT labels in GRUB
+      # Help me configure hostname-based FAT labels in GRUB,
+      # saving the extra `tr --set=UC_HOST --upcase "$hostname"`.
       SPEC="${SPEC#*:}"; SPEC="${SPEC^^}";;
   esac
   case "$SPEC" in
