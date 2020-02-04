@@ -11,7 +11,7 @@ irdex_main () {
   export LANGUAGE="$LANG"
   local ORIG_ARG_ZERO="$0"
   local SELFFILE="$(readlink -f -- "$0")"
-  local SELF_IRD_SCRIPT="$(echo "$0" | sed -nre '
+  local SELF_IRD_SCRIPT="$(echo "$ORIG_ARG_ZERO" | sed -nre '
     s~^/scripts/([a-z]+(-[a-z]+|)/[a-z-]+\.sh)$~\1~p')"
   local SELF_IRD_PHASE="${SELF_IRD_SCRIPT#/scripts/}"
 
@@ -91,7 +91,7 @@ irdex_unfold () {
 
 
 irdex_unfold_why_not_inside_initramfs () {
-  [ "$irdex_inside_initramfs" = 'yes_really' ] && return 0
+  [ "$irdex_unpack" = 'yes_really' ] && return 0
   local WHY_NOT=
   case "$PS1" in
     '# ' | \
@@ -102,7 +102,9 @@ irdex_unfold_why_not_inside_initramfs () {
   mount | cut -d ' ' -sf 1-5 | grep -qxFe 'rootfs on / type rootfs' \
     || WHY_NOT="$WHY_NOT,rootfs"
   [ "$rootmnt" = '/root' ] || WHY_NOT="$WHY_NOT,rootmnt"
-  [ -n "$SELF_IRD_SCRIPT" ] || WHY_NOT="$WHY_NOT,selfpath"
+  [ "$ORIG_ARG_ZERO" == /bin/irdex ] \
+    || [ -n "$SELF_IRD_SCRIPT" ] \
+    || WHY_NOT="$WHY_NOT,selfpath"
   WHY_NOT="${WHY_NOT#,}"
   [ -n "$WHY_NOT" ] || return 0
   echo "$WHY_NOT"
@@ -126,6 +128,7 @@ irdex_ensure_order_triggers () {
   for ADD_TRIG in $SCRIPT_PHASES; do
     [ "$ADD_TRIG" == "$SELF_IRD_PHASE" ] && continue
     ORDER_FILE="/scripts/$ADD_TRIG/ORDER"
+    [ -f "$ORDER_FILE" ] || continue
     grep -qFe "${SELF_IRD_SCRIPT} " -- "$ORDER_FILE" && continue
     sed -re "1i IRDEX_BOOT_PHASE=$ADD_TRIG $SELF_IRD_SCRIPT"' "$@"' \
       -i -- "$ORDER_FILE" || return $?
@@ -187,7 +190,9 @@ irdex_parse_one_disk_spec () {
     upper:* )
       # Help me configure hostname-based FAT labels in GRUB,
       # saving the extra `tr --set=UC_HOST --upcase "$hostname"`.
-      SPEC="${SPEC#*:}"; SPEC="${SPEC^^}";;
+      SPEC="${SPEC#*:}"
+      SPEC="$(echo "$SPEC" | tr a-z A-Z)"   # dash cannot ${^^}
+      ;;
   esac
   case "$SPEC" in
     [LUNIP]:* | /*:* ) DISK_NS="${SPEC%%:*}"; SPEC="${SPEC#*:}";;
