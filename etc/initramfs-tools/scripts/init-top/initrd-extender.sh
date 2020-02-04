@@ -16,8 +16,10 @@ irdex_main () {
   local SELF_IRD_PHASE="${SELF_IRD_SCRIPT#/scripts/}"
 
   local BOOT_PHASE="$IRDEX_BOOT_PHASE"
-  [ -n "$BOOT_PHASE" ] || BOOT_PHASE="$SELF_IRD_PHASE"
+  [ -n "$BOOT_PHASE" ] || BOOT_PHASE="${SELF_IRD_PHASE%/*.sh}"
   [ -n "$BOOT_PHASE" ] || BOOT_PHASE='__unknown__'
+  IRDEX_BOOT_PHASE="$BOOT_PHASE"
+  export IRDEX_BOOT_PHASE
 
   local SCRIPT_PHASES="$(echo $(echo '
     # ./util/find_script_phases.sh
@@ -26,6 +28,7 @@ irdex_main () {
     init-premount
     nfs-top
     local-top
+    # after {local|nfs}-top, a root filesystem is expected to be mounted.
     local-block
     nfs-premount
     local-premount
@@ -45,7 +48,7 @@ irdex_prereqs () {
   #     dynamically determined.
   # :TODO: Test if missing ORDER files were just another aspect of
   #     the tmp-noexec bug.
-  echo ''
+  return 0
 }
 
 
@@ -61,7 +64,7 @@ irdex_log () {
 
 irdex_boot () {
   local WHY_NOT_IRFS="$(irdex_unfold_why_not_inside_initramfs)"
-  ( echo "invoked as '$ORIG_ARG_ZERO'" \
+  ( echo "invoked as '$ORIG_ARG_ZERO', action '$ACTION'" \
       "in phase '$BOOT_PHASE' ('$IRDEX_BOOT_PHASE')"
     echo "our local PS1 (might differ from env): '$PS1'"
     echo "why not initramfs: '$WHY_NOT_IRFS'"
@@ -70,12 +73,21 @@ irdex_boot () {
     irdex_chapter_cmd mount
   ) >"/tmp/irdex_boot_circumstances.debug.$(date +%y%m%d-%H%M%S).$$.txt" 2>&1
 
+  echo "$(date +%T) phase $BOOT_PHASE" \
+    "action $ACTION" \
+    "initrd? $WHY_NOT_IRFS" \
+    "arg0: $ORIG_ARG_ZERO" \
+    "pid: $$" \
+    >>/tmp/irdex_boot_phases.log
+  sleep 2s
+
   if [ -n "$WHY_NOT_IRFS" ]; then
     irdex_log D "Will not unfold: We're probably not inside an initramfs:" \
       "$WHY_NOT_IRFS"
     return 0
   fi
-  irdex_log D "Looks like we're running inside an initramfs. Unfold!"
+  irdex_log D "Looks like we're running inside an initramfs's" \
+    "$BOOT_PHASE stage. Unfold!"
   irdex_unfold || return $?
 
   irdex_scan || return $?
