@@ -60,13 +60,6 @@ irdex_log () {
 
 
 irdex_boot () {
-  for X in 1 2 3 4 5 ; do
-    sleep 3s
-    echo >&2
-    echo  "irdex=$0 ! $X phase: $BOOT_PHASE action: $ACTION" >&2
-  done
-  echo
-
   local WHY_NOT_IRFS="$(irdex_unfold_why_not_inside_initramfs)"
   ( echo "invoked as '$ORIG_ARG_ZERO'" \
       "in phase '$BOOT_PHASE' ('$IRDEX_BOOT_PHASE')"
