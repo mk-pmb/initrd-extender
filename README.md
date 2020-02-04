@@ -161,6 +161,7 @@ Set this to `yes_really` to skip the (unfold:check_booting) checks.
 Known issues
 ------------
 
+* [Known problems with mkinitramfs](docs/mkinitramfs_gotchas.md)
 * Needs more/better tests and docs.
 
 

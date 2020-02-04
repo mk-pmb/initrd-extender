@@ -39,6 +39,12 @@ irdex_main () {
 
 
 irdex_prereqs () {
+  # NB: There is a prereqs call at (or before?) the init-top phase,
+  #     when there are no ORDER files yet. I guess the ORDER is
+  #     figured out anew at each boot, by whatever prereqs are
+  #     dynamically determined.
+  # :TODO: Test if missing ORDER files were just another aspect of
+  #     the tmp-noexec bug.
   echo ''
 }
 
@@ -54,7 +60,31 @@ irdex_log () {
 
 
 irdex_boot () {
-  irdex_unfold
+  for X in 1 2 3 4 5 ; do
+    sleep 3s
+    echo >&2
+    echo  "irdex=$0 ! $X phase: $BOOT_PHASE action: $ACTION" >&2
+  done
+  echo
+
+  local WHY_NOT_IRFS="$(irdex_unfold_why_not_inside_initramfs)"
+  ( echo "invoked as '$ORIG_ARG_ZERO'" \
+      "in phase '$BOOT_PHASE' ('$IRDEX_BOOT_PHASE')"
+    echo "our local PS1 (might differ from env): '$PS1'"
+    echo "why not initramfs: '$WHY_NOT_IRFS'"
+    irdex_chapter_cmd 'env | sort'
+    # ^-- sort: beware the restricted options, e.g. no -V
+    irdex_chapter_cmd mount
+  ) >"/tmp/irdex_boot_circumstances.debug.$(date +%y%m%d-%H%M%S).$$.txt" 2>&1
+
+  if [ -n "$WHY_NOT_IRFS" ]; then
+    irdex_log D "Will not unfold: We're probably not inside an initramfs:" \
+      "$WHY_NOT_IRFS"
+    return 0
+  fi
+  irdex_log D "Looks like we're running inside an initramfs. Unfold!"
+  irdex_unfold || return $?
+
   irdex_scan || return $?
 }
 
@@ -68,30 +98,12 @@ irdex_chapter_cmd () {
 
 irdex_unfold () {
   irdex_symlink_self_to /bin/irdex
-
-  local WHY_NOT_IRFS="$(irdex_unfold_why_not_inside_initramfs)"
-  ( echo "invoked as '$ORIG_ARG_ZERO'" \
-      "in phase '$BOOT_PHASE' ('$IRDEX_BOOT_PHASE')"
-    echo "our local PS1 (might differ from env): '$PS1'"
-    echo "why not initramfs: '$WHY_NOT_IRFS'"
-    irdex_chapter_cmd 'env | sort'
-    # ^-- sort: beware the restricted options, e.g. no -V
-    irdex_chapter_cmd mount
-  ) >"/tmp/irdex_unfold.debug.$(date +%y%m%d-%H%M%S).$$.txt" 2>&1
-
-  if [ -n "$WHY_NOT_IRFS" ]; then
-    irdex_log D "Will not unfold: We're probably not inside an initramfs:" \
-      "$WHY_NOT_IRFS"
-    return 0
-  fi
-  irdex_log D "Looks like we're running inside an initramfs. Unfold!"
-
-  irdex_ensure_order_triggers || return $?
+  irdex_schedule_later_triggers || return $?
 }
 
 
 irdex_unfold_why_not_inside_initramfs () {
-  [ "$irdex_unpack" = 'yes_really' ] && return 0
+  [ "$irdex_inside_initramfs" = 'yes_really' ] && return 0
   local WHY_NOT=
   case "$PS1" in
     '# ' | \
@@ -102,7 +114,7 @@ irdex_unfold_why_not_inside_initramfs () {
   mount | cut -d ' ' -sf 1-5 | grep -qxFe 'rootfs on / type rootfs' \
     || WHY_NOT="$WHY_NOT,rootfs"
   [ "$rootmnt" = '/root' ] || WHY_NOT="$WHY_NOT,rootmnt"
-  [ "$ORIG_ARG_ZERO" == /bin/irdex ] \
+  [ "$ORIG_ARG_ZERO" = /bin/irdex ] \
     || [ -n "$SELF_IRD_SCRIPT" ] \
     || WHY_NOT="$WHY_NOT,selfpath"
   WHY_NOT="${WHY_NOT#,}"
@@ -117,21 +129,56 @@ irdex_symlink_self_to () {
   case "$DEST" in
     */ ) DEST="$DEST/$(basename -- "$SELFFILE")";;
   esac
-  [ -f "$DEST" ] && return 0
+  [ -e "$DEST" ] && return 0
+  [ -L "$DEST" ] && rm -- "$DEST"
   ln -s -- "$SELFFILE" "$DEST" || return $?$(
     irdex_log W "failed to create symlink '$DEST' to '$SELFFILE'")
+}
+
+
+irdex_schedule_later_triggers () {
+  if irdex_check_any_order_exists; then
+    irdex_ensure_order_triggers; return $?
+  fi
+
+  echo "W: Falling back to trying to install triggers without ORDER files." \
+    "This is probably futile." >&2
+  irdex_setup_late_triggers || return $?
+}
+
+
+irdex_check_any_order_exists () {
+  local FN=
+  for FN in /scripts/*/ORDER; do
+    [ -f "$FN" ] && return 0
+  done
+  return 1
 }
 
 
 irdex_ensure_order_triggers () {
   local ADD_TRIG= ORDER_FILE=
   for ADD_TRIG in $SCRIPT_PHASES; do
-    [ "$ADD_TRIG" == "$SELF_IRD_PHASE" ] && continue
     ORDER_FILE="/scripts/$ADD_TRIG/ORDER"
     [ -f "$ORDER_FILE" ] || continue
-    grep -qFe "${SELF_IRD_SCRIPT} " -- "$ORDER_FILE" && continue
-    sed -re "1i IRDEX_BOOT_PHASE=$ADD_TRIG $SELF_IRD_SCRIPT"' "$@"' \
+    sed -re '
+      s~\|.*$~~
+      s~\s+$~~
+      s~^[A-Z_]+=[A-Za-z0-9-]+\s+~~
+      ' -- "$ORDER_FILE" | grep -qxFe "$SELFFILE" && continue
+    sed -re "1i IRDEX_BOOT_PHASE=$ADD_TRIG $SELFFILE" \
       -i -- "$ORDER_FILE" || return $?
+  done
+}
+
+
+irdex_setup_late_triggers () {
+  local ADD_TRIG=
+  local SELF_BN="$(basename -- "$SELF_IRD_SCRIPT")"
+  for ADD_TRIG in $SCRIPT_PHASES; do
+    ADD_TRIG="/scripts/$ADD_TRIG"
+    [ -d "$ADD_TRIG" ] || continue
+    irdex_symlink_self_to "$ADD_TRIG"/ || return $?
   done
 }
 
