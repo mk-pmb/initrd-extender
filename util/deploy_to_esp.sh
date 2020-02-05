@@ -6,7 +6,7 @@ function copy_to_esp () {
   export LANG{,UAGE}=en_US.UTF-8  # make error messages search engine-friendly
   local SELFPATH="$(readlink -m "$BASH_SOURCE"/..)"
   cd "$SELFPATH"/.. || return $?
-  dash -n initrd-extender.sh || return $?
+  busybox sh -n initrd-extender.sh || return $?
 
   source "$SELFPATH"/with_temp_mount.sh --lib || return $?
   with_temp_mount "$1" copy_to_esp__doit || return $?
