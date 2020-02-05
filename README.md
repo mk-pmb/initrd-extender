@@ -63,14 +63,15 @@ If it's present but not (yet) mounted, `irdex` will
 
 1.  try to mount it. If this fails, skip the device.
 1.  check whether it has an `/irdex-fx` directory. If not, skip the device.
-1.  __(fx:bin)__
-    If there are any files inside directory `/irdex-fx/bin`,
+1.  __(fx:bin-all)__
+    If there are any files inside directories `/irdex-fx/bin` and/or
+    `/irdex-fx/bin-all`,
     copy each of them to `/bin` and mark the destination files executable.
     (This way your source disk can use a file system that does not support
     the executable bit.)
     Some known script filename extensions (e.g. `.sh`, `.py`, `.pl`, `.sed`)
     are stripped from the destination filename.
-1.  __(fx:bin-arch)__ Same as (fx:bin) but with directory
+1.  __(fx:bin-arch)__ Same as (fx:bin-all) but with directory
     `/irdex-fx/bin-###`, where `###` is the machine architecture reported
     by `uname -m`, e.g. `/irdex-fx/bin-i686` or `/irdex-fx/bin-x86_64`.
 1.  __(fx:upd)__

@@ -393,7 +393,13 @@ irdex_mount_extend_disk () {
     irdex_log E "Failed to chdir into fxdir: $FXDIR")
 
   local ARCH="$(uname -m)" # -p = CPU type was unknown in dvalin @2019-09-21
+  local PLATFORM_SUFFIXES="
+    ''
+    -all
+    -$ARCH
+    "
   irdex_install_progs || return $?
+
   irdex_install_extras '' upd || return $?
   irdex_install_extras -n add || return $?
   irdex_install_autorun_script || return $?
@@ -406,17 +412,19 @@ irdex_install_progs () {
   # Examples missing from busybox: bash socat tar
   # Examples crippled in busybox: cp grep readlink sed
   local ITEM= DEST=
-  for ITEM in "$FXDIR/bin"/* "$FXDIR/bin-$ARCH"/*; do
-    [ -f "$ITEM" ] || continue
-    DEST="${ITEM##*/}"
-    DEST="${DEST%.pl}"
-    DEST="${DEST%.py}"
-    DEST="${DEST%.sed}"
-    DEST="${DEST%.sh}"
-    DEST="/bin/$DEST"
-    [ -L "$DEST" ] && rm -- "$DEST"
-    cp -- "$ITEM" "$DEST" # busybox needs cripppled options
-    chmod a+x -- "$DEST" # busybox needs cripppled options
+  for ITEM in $PLATFORM_SUFFIXES; do
+    for ITEM in "$FXDIR"/bin"$ITEM"/*; do
+      [ -f "$ITEM" ] || continue
+      DEST="${ITEM##*/}"
+      DEST="${DEST%.pl}"
+      DEST="${DEST%.py}"
+      DEST="${DEST%.sed}"
+      DEST="${DEST%.sh}"
+      DEST="/bin/$DEST"
+      [ -L "$DEST" ] && rm -- "$DEST"
+      cp -- "$ITEM" "$DEST" # busybox needs cripppled options
+      chmod a+x -- "$DEST" # busybox needs cripppled options
+    done
   done
 }
 
@@ -431,8 +439,10 @@ irdex_install_extras () {
   # find-elf-shared-libs bash sed socat tar # uses ldd under the hood
   # Options must be crippled for busybox's cp:
   local ITEM=
-  for ITEM in "$FXDIR/$SUBDIR"/* "$FXDIR/$SUBDIR-$ARCH"/*; do
-    irdex_copy_helper "$ITEM" / || return $?
+  for ITEM in $PLATFORM_SUFFIXES; do
+    for ITEM in "$FXDIR/$SUBDIR$ITEM"/*; do
+      irdex_copy_helper "$ITEM" / || return $?
+    done
   done
 }
 
