@@ -72,13 +72,24 @@ irdex_hook_install_helpful_tools () {
   local TOOLS='
     agetty
     base64
+    basename
     bash
+    dirname
     grep
+    head
+    less
     lvm
+    nl
     readlink
+    rev
     sed
-    sha{1,256,512}
+    setsid
+    sha1sum
+    sha256sum
+    sha512sum
     socat
+    tac
+    tail
     tar
     '
   local ITEM=
