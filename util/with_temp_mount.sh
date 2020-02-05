@@ -23,7 +23,9 @@ function with_temp_mount () {
   if [ -n "$TGT_WAS_MOUNTED" ]; then
     [ ! -d "$TGT_DEST" ] || thun "$TGT_DEST" || return $?
   else
+    echo -n "D: umounting $TGT_MNPT… "
     umount "$TGT_MNPT" || return $?
+    echo 'done.'
   fi
 }
 

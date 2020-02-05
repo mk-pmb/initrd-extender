@@ -15,15 +15,16 @@ irdex_main () {
     s~^/scripts/([a-z]+(-[a-z]+|)/[a-z-]+\.sh)$~\1~p')"
   local SELF_IRD_PHASE="${SELF_IRD_SCRIPT#/scripts/}"
 
-  local BOOT_PHASE="$IRDEX_BOOT_PHASE"
+  local BOOT_PHASE="$irdex_boot_phase"
+  unabbreviate_boot_phase || return $?
   [ -n "$BOOT_PHASE" ] || BOOT_PHASE="${SELF_IRD_PHASE%/*.sh}"
   [ -n "$BOOT_PHASE" ] || BOOT_PHASE='__unknown__'
-  IRDEX_BOOT_PHASE="$BOOT_PHASE"
-  export IRDEX_BOOT_PHASE
+  irdex_boot_phase="$BOOT_PHASE"
+  export irdex_boot_phase
 
   local SCRIPT_PHASES="$(echo $(echo '
     # ./util/find_script_phases.sh
-    # NB: if an nfs stage is used, its local twin will be skipped.
+    # NB: if an nfs phase is used, its local twin will be skipped.
     init-top
     init-premount
     nfs-top
@@ -52,6 +53,28 @@ irdex_prereqs () {
 }
 
 
+unabbreviate_boot_phase () {
+  local A="${ACTION%-*}"
+  local B="${ACTION#*-}"
+  [ "$ACTION" = "$A-$B" ] || return 0
+  case "$A" in
+    i ) A='init';;
+    l ) A='local';;
+    n ) A='nfs';;
+    * ) return 0;;
+  esac
+  case "$B" in
+    t ) B='top';;
+    p ) B='premount';;
+    b ) B='block';;
+    B ) B='bottom';;
+    * ) return 0;;
+  esac
+  BOOT_PHASE="$A-$B"
+  ACTION='boot'
+}
+
+
 irdex_log () {
   local LVL="$1"; shift
   MSG="$(date +'%F %T') irdex[$$]: $LVL: $*"
@@ -65,7 +88,7 @@ irdex_log () {
 irdex_boot () {
   local WHY_NOT_IRFS="$(irdex_unfold_why_not_inside_initramfs)"
   ( echo "invoked as '$ORIG_ARG_ZERO', action '$ACTION'" \
-      "in phase '$BOOT_PHASE' ('$IRDEX_BOOT_PHASE')"
+      "in phase '$BOOT_PHASE'"
     echo "our local PS1 (might differ from env): '$PS1'"
     echo "why not initramfs: '$WHY_NOT_IRFS'"
     irdex_chapter_cmd 'env | sort'
@@ -79,15 +102,15 @@ irdex_boot () {
     "arg0: $ORIG_ARG_ZERO" \
     "pid: $$" \
     >>/tmp/irdex_boot_phases.log
-  sleep 2s
 
   if [ -n "$WHY_NOT_IRFS" ]; then
     irdex_log D "Will not unfold: We're probably not inside an initramfs:" \
       "$WHY_NOT_IRFS"
+    tty -s && irdex_log H "To skip this check, try actions 'unfold' or 'scan'."
     return 0
   fi
   irdex_log D "Looks like we're running inside an initramfs's" \
-    "$BOOT_PHASE stage. Unfold!"
+    "$BOOT_PHASE phase. Unfold!"
   irdex_unfold || return $?
 
   irdex_scan || return $?
@@ -171,7 +194,7 @@ irdex_ensure_order_triggers () {
       s~\s+$~~
       s~^[A-Z_]+=[A-Za-z0-9-]+\s+~~
       ' -- "$ORDER_FILE" | grep -qxFe "$SELFFILE" && continue
-    sed -re "1i IRDEX_BOOT_PHASE=$ADD_TRIG $SELFFILE" \
+    sed -re "1i irdex_boot_phase=$ADD_TRIG $SELFFILE" \
       -i -- "$ORDER_FILE" || return $?
   done
 }
@@ -188,8 +211,29 @@ irdex_setup_late_triggers () {
 }
 
 
+irdex_env_parse_kopt () {
+  tr ' ' '\n' | sed -nre '
+    s~'"'"'~&\\&&~g
+    s~^([A-Za-z0-9_-]+)=(.*$|$\
+      )~if [ -z "$\1" ]; then \1='"'"'\2'"'"'; export \1; fi~p
+    '
+}
+
+
 irdex_scan () {
+  local IMP='/tmp/env_import_cmdline.rc'
+  if [ -z "$irdex_disks" ]; then
+    irdex_log W "Empty irdex_disks! Will try to parse kernel commandline:" >&2
+    </proc/cmdline irdex_env_parse_kopt >"$IMP" || return $?
+    # ls -l -- "$IMP"
+    # sed -re 's~^~\t» ~' -- "$IMP"
+    irdex_log D "Import $IMP…"
+    . "$IMP" || return $?
+    [ -n "$irdex_disks" ] || irdex_log W \
+      "Still no irdex_disks even after importing $IMP." >&2
+  fi
   irdex_parse_disk_specs "$irdex_disks $*" mount_extend || return $?
+  irdex_run_all_autorun_scripts || return $?
 }
 
 
@@ -238,6 +282,14 @@ irdex_parse_one_disk_spec () {
   local ACTION="$1"; shift
   [ -n "$SPEC" ] || return 0
   local DISK_NS='L' MNTP= NICK=
+  case "$SPEC" in
+    ESP: )
+      if [ -z "$irdex_esp_label" ]; then
+        irdex_esp_label="$(echo "$irdex_host" | tr a-z A-Z)_ESP"
+        export irdex_esp_label
+      fi
+      SPEC="L:$irdex_esp_label";;
+  esac
   case "$SPEC" in
     upper:* )
       # Help me configure hostname-based FAT labels in GRUB,
@@ -344,7 +396,7 @@ irdex_mount_extend_disk () {
   irdex_install_progs || return $?
   irdex_install_extras '' upd || return $?
   irdex_install_extras -n add || return $?
-  irdex_autorun || return $?
+  irdex_install_autorun_script || return $?
 }
 
 
@@ -431,17 +483,31 @@ irdex_copy_noreplace () {
 }
 
 
-irdex_autorun () {
+irdex_install_autorun_script () {
   local ORIG="$FXDIR/autorun.sh"
   if [ ! -f "$ORIG" ]; then
     irdex_log D "autorun script not found: $ORIG"
     return 0
   fi
   local DEST="/bin/irdex-autorun-$NICK"
+  irdex_log D "Install autorun script $ORIG as $DEST…"
   cp -- "$ORIG" "$DEST" # busybox needs cripppled options
   chmod a+x -- "$DEST" # busybox needs cripppled options
-  irdex_log D "autorun $ORIG as $DEST:"
-  IRDEX_DEV="$DISK_DEV" IRDEX_NAME="$NICK" IRDEX_FXDIR="$FXDIR" "$DEST"
+  (
+    echo IRDEX_DEV="$DISK_DEV"
+    echo IRDEX_NAME="$NICK"
+    echo IRDEX_FXDIR="$FXDIR"
+  ) >"$DEST".ctx
+}
+
+
+irdex_run_all_autorun_scripts () {
+  local ITEM=
+  for ITEM in /bin/irdex-autorun-*; do
+    [ -x "$ITEM" ] || continue
+    irdex_log D "Run autorun script $ITEM…"
+    "$ITEM" || return $?
+  done
 }
 
 
