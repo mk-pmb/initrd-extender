@@ -333,7 +333,7 @@ irdex_parse_one_disk_spec () {
       # Help me configure hostname-based FAT labels in GRUB,
       # saving the extra `tr --set=UC_HOST --upcase "$hostname"`.
       SPEC="${SPEC#*:}"
-      SPEC="$(echo "$SPEC" | tr a-z A-Z)"   # dash cannot ${^^}
+      SPEC="$(echo "$SPEC" | tr a-z A-Z)"   # busybox sh cannot ${^^}
       ;;
   esac
   case "$SPEC" in
