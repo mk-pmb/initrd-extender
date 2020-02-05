@@ -432,9 +432,9 @@ irdex_mount_extend_disk () {
 
   local ARCH="$(uname -m)" # -p = CPU type was unknown in dvalin @2019-09-21
   local PLATFORM_SUFFIXES="
-    ''
-    -all
-    -$ARCH
+    /
+    -all/
+    -$ARCH/
     "
   irdex_install_progs || return $?
 
@@ -451,7 +451,7 @@ irdex_install_progs () {
   # Examples crippled in busybox: cp grep readlink sed
   local ITEM= DEST=
   for ITEM in $PLATFORM_SUFFIXES; do
-    for ITEM in "$FXDIR"/bin"$ITEM"/*; do
+    for ITEM in "$FXDIR"/bin"$ITEM"*; do
       [ -f "$ITEM" ] || continue
       DEST="${ITEM##*/}"
       DEST="${DEST%.pl}"
@@ -478,7 +478,7 @@ irdex_install_extras () {
   # Options must be crippled for busybox's cp:
   local ITEM=
   for ITEM in $PLATFORM_SUFFIXES; do
-    for ITEM in "$FXDIR/$SUBDIR$ITEM"/*; do
+    for ITEM in "$FXDIR/$SUBDIR$ITEM"*; do
       irdex_copy_helper "$ITEM" / || return $?
     done
   done
