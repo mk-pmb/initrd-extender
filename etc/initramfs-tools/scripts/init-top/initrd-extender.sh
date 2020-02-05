@@ -16,7 +16,7 @@ irdex_main () {
   local SELF_IRD_PHASE="${SELF_IRD_SCRIPT#/scripts/}"
 
   local BOOT_PHASE="$irdex_boot_phase"
-  unabbreviate_boot_phase || return $?
+  irdex_unabbreviate_boot_phase || return $?
   [ -n "$BOOT_PHASE" ] || BOOT_PHASE="${SELF_IRD_PHASE%/*.sh}"
   [ -n "$BOOT_PHASE" ] || BOOT_PHASE='__unknown__'
   irdex_boot_phase="$BOOT_PHASE"
@@ -49,11 +49,48 @@ irdex_prereqs () {
   #     dynamically determined.
   # :TODO: Test if missing ORDER files were just another aspect of
   #     the tmp-noexec bug.
-  return 0
+
+  irdex_hook_install_helpful_tools || return $?
 }
 
 
-unabbreviate_boot_phase () {
+irdex_hook_install_helpful_tools () {
+  # According to `man 8 initramfs-tools`, this should be in a hook,
+  # not a script. However, I prefer to install irdex by copying
+  # just one file.
+  local HOOKFUNCS_LIB='/usr/share/initramfs-tools/hook-functions'
+  [ -f "$HOOKFUNCS_LIB" ] || return 0
+  case "$DESTDIR" in
+    /tmp/mkinitramfs_* ) ;;
+    * )
+      echo "E: irdex_hook_install_helpful_tools: flinching:" \
+        "unusual target directory DESTDIR='$DESTDIR'" >&2
+      return 3;;
+  esac
+  . "$HOOKFUNCS_LIB" || return 0
+
+  local TOOLS='
+    agetty
+    base64
+    bash
+    grep
+    lvm
+    readlink
+    sed
+    sha{1,256,512}
+    socat
+    tar
+    '
+  local ITEM=
+  for ITEM in $TOOLS; do
+    ITEM="$(which "$ITEM" 2>/dev/null | grep '^/')"
+    [ -n "$ITEM" ] || continue
+    copy_exec "$ITEM" || return $?
+  done
+}
+
+
+irdex_unabbreviate_boot_phase () {
   local A="${ACTION%-*}"
   local B="${ACTION#*-}"
   [ "$ACTION" = "$A-$B" ] || return 0
@@ -467,9 +504,12 @@ irdex_bin_alias_busybox_funcs () {
   local ITEM=
   for ITEM in $BB_FUNCS; do
     which "$ITEM" >/dev/null && continue
-    ITEM="/bin/$ITEM"
+    ITEM="/usr/bin/$ITEM"
+    # Would be easier to just use /bin but I'd like to not clutter that one,
+    # so it will be easier for me to see which of my own programs have been
+    # copied from irdex-fx/bin-*.
     [ -e "$ITEM" ] && continue
-    ln -sn busybox "$ITEM" || return $?
+    ln -sn /bin/busybox "$ITEM" || return $?
   done
 }
 

@@ -8,8 +8,9 @@ function copy_to_esp () {
   cd "$SELFPATH"/.. || return $?
   busybox sh -n initrd-extender.sh || return $?
 
+  local DEST_DISK_LABEL="$1"; shift
   source "$SELFPATH"/with_temp_mount.sh --lib || return $?
-  with_temp_mount "$1" copy_to_esp__doit || return $?
+  with_temp_mount "$DEST_DISK_LABEL" copy_to_esp__doit || return $?
 }
 
 
