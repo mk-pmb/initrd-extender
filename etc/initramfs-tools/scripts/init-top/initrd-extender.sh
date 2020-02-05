@@ -126,6 +126,7 @@ irdex_chapter_cmd () {
 
 irdex_unfold () {
   irdex_symlink_self_to /bin/irdex
+  irdex_bin_alias_busybox_funcs
   irdex_schedule_later_triggers || return $?
 }
 
@@ -443,6 +444,32 @@ irdex_install_extras () {
     for ITEM in "$FXDIR/$SUBDIR$ITEM"/*; do
       irdex_copy_helper "$ITEM" / || return $?
     done
+  done
+}
+
+
+irdex_bin_alias_busybox_funcs () {
+  # Ensure that shells other than busybox can find basic commands like
+  # "dirname" and "tee" as well.
+  local BB_FUNCS='
+    : skip
+      n
+      /Currently defined functions:/b funcs_list
+    b skip
+    : funcs_list
+      n
+      /^\s+/!b skip
+      s~\s|,~\n~g
+      p
+    b funcs_list
+    '
+  BB_FUNCS="$(busybox 2>&1 | sed -nre "$BB_FUNCS" | sed -nre '/^[a-z]\S+$/p')"
+  local ITEM=
+  for ITEM in $BB_FUNCS; do
+    which "$ITEM" >/dev/null && continue
+    ITEM="/bin/$ITEM"
+    [ -e "$ITEM" ] && continue
+    ln -sn busybox "$ITEM" || return $?
   done
 }
 
