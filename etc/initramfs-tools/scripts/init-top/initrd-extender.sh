@@ -161,7 +161,29 @@ irdex_boot () {
     "$BOOT_PHASE phase. Unfold!"
   irdex_unfold || return $?
 
+  local IMP='/tmp/env_import_cmdline.rc'
+  if [ -z "$irdex_disks" ]; then
+    irdex_log W "Empty irdex_disks! Will try to parse kernel commandline:" >&2
+    </proc/cmdline irdex_env_parse_kopt >"$IMP" || return $?
+    # ls -l -- "$IMP"
+    # sed -re 's~^~\t» ~' -- "$IMP"
+    irdex_log D "Import $IMP…"
+    . "$IMP" || return $?
+    [ -n "$irdex_disks" ] || irdex_log W \
+      "Still no irdex_disks even after importing $IMP." >&2
+  fi
+
+  irdex_check_fix_hostname || return $?
   irdex_scan || return $?
+}
+
+
+irdex_check_fix_hostname () {
+  [ -n "$irdex_host" ] && return 0
+  [ -f /etc/hostname ] && return 0
+  [ "$(hostname)" = '(none)' ] && return 0
+  echo "$irdex_host" >/etc/hostname
+  hostname "$irdex_host"
 }
 
 
@@ -270,17 +292,6 @@ irdex_env_parse_kopt () {
 
 
 irdex_scan () {
-  local IMP='/tmp/env_import_cmdline.rc'
-  if [ -z "$irdex_disks" ]; then
-    irdex_log W "Empty irdex_disks! Will try to parse kernel commandline:" >&2
-    </proc/cmdline irdex_env_parse_kopt >"$IMP" || return $?
-    # ls -l -- "$IMP"
-    # sed -re 's~^~\t» ~' -- "$IMP"
-    irdex_log D "Import $IMP…"
-    . "$IMP" || return $?
-    [ -n "$irdex_disks" ] || irdex_log W \
-      "Still no irdex_disks even after importing $IMP." >&2
-  fi
   irdex_parse_disk_specs "$irdex_disks $*" mount_extend || return $?
   irdex_run_all_autorun_scripts || return $?
 }
