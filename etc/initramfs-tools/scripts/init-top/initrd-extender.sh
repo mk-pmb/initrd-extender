@@ -58,6 +58,38 @@ irdex_prereqs () {
 }
 
 
+irdex_hook_suggest_helpful_tools () {
+  echo '
+    agetty
+    base64
+    basename
+    bash
+    dirname
+    grep
+    head
+    less
+    lvm
+    nl
+    ps
+    readlink
+    rev
+    sed
+    setsid
+    sha1sum
+    sha256sum
+    sha512sum
+    socat
+    sponge
+    tac
+    tail
+    tar
+    ts
+    '
+  local PROG="$(which fsck)"
+  [ -x "$PROG" ] && ls -- "$PROG" "$PROG".*
+}
+
+
 irdex_hook_install_helpful_tools () {
   # According to `man 8 initramfs-tools`, this should be in a hook,
   # not a script. However, I prefer to install irdex by copying
@@ -73,29 +105,7 @@ irdex_hook_install_helpful_tools () {
   esac
   . "$HOOKFUNCS_LIB" || return 0
 
-  local TOOLS='
-    agetty
-    base64
-    basename
-    bash
-    dirname
-    grep
-    head
-    less
-    lvm
-    nl
-    readlink
-    rev
-    sed
-    setsid
-    sha1sum
-    sha256sum
-    sha512sum
-    socat
-    tac
-    tail
-    tar
-    '
+  local TOOLS="$(irdex_hook_suggest_helpful_tools)"
   local ITEM=
   for ITEM in $TOOLS; do
     ITEM="$(which "$ITEM" 2>/dev/null | grep '^/')"
