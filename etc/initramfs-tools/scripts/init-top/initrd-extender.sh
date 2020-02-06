@@ -629,6 +629,67 @@ irdex_run_all_autorun_scripts () {
 }
 
 
+irdex_retryable () {
+  local MAX_FAILS="$1"; shift
+  local FAIL_DELAY="$1"; shift
+  "$@" && return 0
+  local RV=$? FAIL_CNT=1
+  while [ "$MAX_FAILS" -gt "$FAIL_CNT" ]; do
+    irdex_log W "retryable: fail #$FAIL_CNT (rv=$RV) of $MAX_FAILS max.," \
+      "will retry in $FAIL_DELAY: $*"
+    sleep "$FAIL_DELAY"
+    "$@"
+    RV=$?
+    [ "$RV" = 0 ] && return 0
+    FAIL_CNT=$(( $FAIL_CNT + 1 ))
+  done
+  irdex_log W "retryable: final fail (rv=$RV) of $MAX_FAILS max.: $*"
+  return "$RV"
+}
+
+
+irdex_boot_luks_lvm_by_keyfile () {
+  irdex_unlock_luks_lvm_by_keyfile "$@" || return $?
+  irdex_retryable 5 1s test -b "$ROOT" || return $?
+  irdex_actually_mount "$ROOT" "$rootmnt" || return $?
+  irdex_umount_all_mnt || return $?
+}
+
+
+irdex_unlock_luks_lvm_by_keyfile () {
+  local KEY_FILE="$1"; shift
+  case "$KEY_FILE" in
+    /dev/fd/[3-9]* | /dev/fd/[1-9][0-9]* )
+      irdex_log E "It's not reliable to pass $KEY_FILE as key file:" \
+        'lvm might consider extra file descriptors as accidentially leaked,' \
+        'and thus might flinch. Instead, use stdin ("-").';;
+  esac
+  cryptsetup open --type=luks --key-file "$KEY_FILE" "$@" \
+    -- "$irdex_lvm_disk" "$irdex_lvm_pv" || return $?
+  irdex_retryable 5 1s test -b /dev/mapper/"$irdex_lvm_pv" || return $?
+  lvm vgchange --activate y "$irdex_lvm_vg" || return $?
+}
+
+
+irdex_umount_all_mnt () {
+  # At the time initrd switches the /root, no other disks should be mounted,
+  # or you'll get a kernel panic about "trying to kill init", probably
+  # because the old init can't let go of its mounts and thus doesn't
+  # quit in time..
+  local MNT=
+  for MNT in $(mount | sed -nre 's~^\S+ on (/mnt/\S+) type .*$~\1~p'); do
+    umount -l "$MNT"
+  done
+  sleep 1s
+  for MNT in $(mount | sed -nre 's~^\S+ on (/mnt/\S+) type .*$~\1~p'); do
+    umount "$MNT" || return $?
+  done
+}
+
+
+
+
+
 
 
 
