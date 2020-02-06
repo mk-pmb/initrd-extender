@@ -15,6 +15,10 @@ irdex_main () {
     s~^/scripts/([a-z]+(-[a-z]+|)/[a-z-]+\.sh)$~\1~p')"
   local SELF_IRD_PHASE="${SELF_IRD_SCRIPT#/scripts/}"
 
+  [ -n "$irdex_tmpdir" ] || export irdex_tmpdir=/tmp/initrd-extender
+  [ -n "$irdex_flagdir" ] || export irdex_flagdir="$irdex_tmpdir"/flags
+  mkdir -p -- "$irdex_flagdir" || return $?
+
   local BOOT_PHASE="$irdex_boot_phase"
   irdex_unabbreviate_boot_phase || return $?
   [ -n "$BOOT_PHASE" ] || BOOT_PHASE="${SELF_IRD_PHASE%/*.sh}"
@@ -195,9 +199,11 @@ irdex_chapter_cmd () {
 
 
 irdex_unfold () {
+  [ -f "$irdex_flagdir/done.unfold" ] && return 0
   irdex_symlink_self_to /bin/irdex
-  irdex_bin_alias_busybox_funcs
+  irdex_bin_alias_busybox_funcs || return $?
   irdex_schedule_later_triggers || return $?
+  date >"$irdex_flagdir/done.unfold" || return $?
 }
 
 
@@ -434,6 +440,12 @@ irdex_mount_extend_disk () {
     irdex_log D "not (yet/again) a block device: $DISK_DEV ($NICK)"
     return 0
   fi
+
+  if [ -f "$irdex_flagdir/diskext.$NICK" ]; then
+    irdex_log D "disk has been extended earlier already: $DISK_DEV ($NICK)"
+    return 0
+  fi
+
   mkdir -p -- "$MNTP" || return $?$(
     irdex_log E "failed to create mountpoint $MNPT for $DISK_DEV")
   local FXDIR="$MNTP/irdex-fx"
@@ -463,6 +475,7 @@ irdex_mount_extend_disk () {
   irdex_install_extras '' upd || return $?
   irdex_install_extras -n add || return $?
   irdex_install_autorun_script || return $?
+  date >"$irdex_flagdir/diskext.$NICK" || return $?
 }
 
 
@@ -601,11 +614,17 @@ irdex_install_autorun_script () {
 
 
 irdex_run_all_autorun_scripts () {
-  local ITEM=
-  for ITEM in /bin/irdex-autorun-*; do
+  local BASE='/bin/irdex-autorun-' ITEM= FLAG=
+  for ITEM in "$BASE"*; do
     [ -x "$ITEM" ] || continue
+    FLAG="$irdex_flagdir/autorun.${ITEM#$BASE}"
+    if [ -f "$FLAG" ]; then
+      irdex_log D "Skip autorun script $ITEM: marked as done."
+      return 0
+    fi
     irdex_log D "Run autorun script $ITEM…"
-    "$ITEM" || return $?
+    irdex_autorun_done_flag="$FLAG" "$ITEM" || return $?
+    # scripts shall do themselves if they like: # date >"$FLAG" || return $?
   done
 }
 
