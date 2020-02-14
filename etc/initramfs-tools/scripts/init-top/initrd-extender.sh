@@ -98,6 +98,7 @@ irdex_hook_install_helpful_tools () {
   [ -f "$HOOKFUNCS_LIB" ] || return 0
   case "$DESTDIR" in
     /tmp/mkinitramfs_* ) ;;
+    /var/tmp/mkinitramfs_* ) ;;
     * )
       echo "E: irdex_hook_install_helpful_tools: flinching:" \
         "unusual target directory DESTDIR='$DESTDIR'" >&2
