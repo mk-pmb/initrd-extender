@@ -17,7 +17,7 @@ irdex_main () {
 
   [ -n "$irdex_tmpdir" ] || export irdex_tmpdir=/tmp/initrd-extender
   [ -n "$irdex_flagdir" ] || export irdex_flagdir="$irdex_tmpdir"/flags
-  mkdir -p -- "$irdex_flagdir" || return $?
+  [ "$ACTION" = prereqs ] || irdex_set_flag "launch.action.$ACTION" || return $?
 
   local BOOT_PHASE="$irdex_boot_phase"
   irdex_unabbreviate_boot_phase || return $?
@@ -55,6 +55,12 @@ irdex_prereqs () {
   #     the tmp-noexec bug.
 
   irdex_hook_install_helpful_tools || return $?
+}
+
+
+irdex_set_flag () {
+  mkdir -p -- "$irdex_flagdir"
+  [ -z "$1" ] || date >"$irdex_flagdir/$1" || return $?
 }
 
 
@@ -214,7 +220,7 @@ irdex_unfold () {
   irdex_symlink_self_to /bin/irdex
   irdex_bin_alias_busybox_funcs || return $?
   irdex_schedule_later_triggers || return $?
-  date >"$irdex_flagdir/done.unfold" || return $?
+  irdex_set_flag done.unfold || return $?
 }
 
 
@@ -486,7 +492,7 @@ irdex_mount_extend_disk () {
   irdex_install_extras '' upd || return $?
   irdex_install_extras -n add || return $?
   irdex_install_autorun_script || return $?
-  date >"$irdex_flagdir/diskext.$NICK" || return $?
+  irdex_set_flag "diskext.$NICK" || return $?
 }
 
 
