@@ -64,6 +64,22 @@ irdex_set_flag () {
 }
 
 
+irdex_flag_once () {
+  local TASK="$1"; shift
+  TASK="${TASK//=/${1#irdex_}}"
+  if [ -f "$irdex_flagdir/done.$TASK" ]; then
+    irdex_log D "skip task (already done): $*"
+    return 0
+  fi
+  if [ -f "$irdex_flagdir/skip.$TASK" ]; then
+    irdex_log D "skip task as requested: $*"
+    return 0
+  fi
+  "$@" || return $?
+  irdex_set_flag "done.$TASK" || return $?
+}
+
+
 irdex_hook_suggest_helpful_tools () {
   echo '
     agetty
@@ -196,6 +212,9 @@ irdex_boot () {
 
   irdex_check_fix_hostname || return $?
   irdex_scan || return $?
+
+  [ "$irdex_boot_phase" != init-bottom ] \
+    || irdex_flag_once finally_= irdex_umount_all_mnt || return $?
 }
 
 
@@ -702,6 +721,8 @@ irdex_umount_all_mnt () {
     umount "$MNT" || return $?
   done
 }
+
+
 
 
 
