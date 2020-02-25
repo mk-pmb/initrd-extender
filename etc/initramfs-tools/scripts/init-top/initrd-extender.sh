@@ -66,7 +66,8 @@ irdex_set_flag () {
 
 irdex_flag_once () {
   local TASK="$1"; shift
-  TASK="${TASK//=/${1#irdex_}}"
+  local SED="s|=|${1#irdex_}|g"
+  TASK="$(echo "$TASK" | sed -re "$SED")"
   if [ -f "$irdex_flagdir/done.$TASK" ]; then
     irdex_log D "skip task (already done): $*"
     return 0
