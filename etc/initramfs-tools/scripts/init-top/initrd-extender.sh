@@ -253,8 +253,9 @@ irdex_unfold_why_not_inside_initramfs () {
     '(initramfs) '* ) ;; # probably running inside rescue shell
     * ) WHY_NOT="$WHY_NOT,ps1";;
   esac
-  mount | cut -d ' ' -sf 1-5 | grep -qxFe 'rootfs on / type rootfs' \
-    || WHY_NOT="$WHY_NOT,rootfs"
+  local ROOTFS_MNT="$(mount | sed -nre '
+    s~^(\S+) on / type rootfs .*$~\1~p')"
+  [ -n "$ROOTFS_MNT" ] || WHY_NOT="$WHY_NOT,rootfs"
   [ "$rootmnt" = '/root' ] || WHY_NOT="$WHY_NOT,rootmnt"
   [ "$ORIG_ARG_ZERO" = /bin/irdex ] \
     || [ -n "$SELF_IRD_SCRIPT" ] \
