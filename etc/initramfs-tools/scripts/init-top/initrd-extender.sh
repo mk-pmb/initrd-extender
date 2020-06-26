@@ -644,9 +644,9 @@ irdex_install_autorun_script () {
   cp -- "$ORIG" "$DEST" # busybox needs cripppled options
   chmod a+x -- "$DEST" # busybox needs cripppled options
   (
-    echo IRDEX_DEV="$DISK_DEV"
-    echo IRDEX_NAME="$NICK"
-    echo IRDEX_FXDIR="$FXDIR"
+    echo irdex_dev="$DISK_DEV"
+    echo irdex_name="$NICK"
+    echo irdex_fxdir="$FXDIR"
   ) >"$DEST".ctx
 }
 
