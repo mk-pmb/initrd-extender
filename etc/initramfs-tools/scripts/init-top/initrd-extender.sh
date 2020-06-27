@@ -385,7 +385,18 @@ irdex_parse_one_disk_spec () {
   local SPEC="$1"; shift
   local ACTION="$1"; shift
   [ -n "$SPEC" ] || return 0
-  local DISK_NS='L' MNTP= NICK=
+  local DISK_NS='L' MNTP= NICK= WAIT=
+  case "$SPEC" in
+    WAIT:* ) WAIT=+; SPEC="${SPEC#*:}";;
+  esac
+  case "$SPEC" in
+    ESP: )
+      if [ -z "$irdex_esp_label" ]; then
+        irdex_esp_label="$(echo "$irdex_host" | tr a-z A-Z)_ESP"
+        export irdex_esp_label
+      fi
+      SPEC="L:$irdex_esp_label";;
+  esac
   case "$SPEC" in
     ESP: )
       if [ -z "$irdex_esp_label" ]; then
@@ -436,9 +447,17 @@ irdex_parse_one_disk_spec () {
       return 0;;
   esac
 
+  if [ -n "$WAIT" -a "$irdex_boot_phase" == init-premount ]; then
+    # 2020-06-27: Wait only in init-premount, not earlier: In Ubuntu focal
+    # on one of my netbooks, approximately until this phase the display
+    # font is garbled and my USB HDD adapter isn't detected.
+    irdex_log D "Waiting for '$NICK' ('$DISK_DEV' -> '$MNTP')"
+    irdex_retryable 10 6s test -e "$DISK_DEV" || return $?
+  fi
+
   case "$ACTION" in
     debug )
-      irdex_log D "DISK_DEV='$DISK_DEV' NICK='$NICK' MNTP='$MNTP'"
+      irdex_log D "DISK_DEV='$DISK_DEV' NICK='$NICK' MNTP='$MNTP' WAIT='$WAIT'"
       return 0;;
     * ) ACTION="irdex_${ACTION}_disk"
   esac
