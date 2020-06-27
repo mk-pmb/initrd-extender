@@ -652,6 +652,23 @@ irdex_copy_noreplace () {
 }
 
 
+irdex_envfile () {
+  local ENVF="$(sed -re "
+    s~'~'"'\\'"''~g
+    s~$~'~
+    s~^~export '~
+    " -- "$1")"
+  shift
+  if [ "$#" == 0 ]; then
+    echo "$ENVF"
+    return 0
+  fi
+  eval "$ENVF"
+  unset ENVF
+  "$@"
+}
+
+
 irdex_install_autorun_script () {
   local ORIG="$FXDIR/autorun.sh"
   if [ ! -f "$ORIG" ]; then
@@ -672,6 +689,7 @@ irdex_install_autorun_script () {
 
 irdex_run_all_autorun_scripts () {
   local BASE='/bin/irdex-autorun-' ITEM= FLAG=
+  cd /
   for ITEM in "$BASE"*; do
     [ -x "$ITEM" ] || continue
     FLAG="$irdex_flagdir/autorun.${ITEM#$BASE}"
@@ -680,7 +698,10 @@ irdex_run_all_autorun_scripts () {
       return 0
     fi
     irdex_log D "Run autorun script $ITEM…"
+    eval "$(irdex_envfile "$ITEM".ctx)"
+    [ -d "$irdex_fxdir" ] && cd -- "$irdex_fxdir"
     irdex_autorun_done_flag="$FLAG" "$ITEM" || return $?
+    cd /
     # scripts shall do themselves if they like: # date >"$FLAG" || return $?
   done
 }
