@@ -211,11 +211,24 @@ irdex_boot () {
       "Still no irdex_disks even after importing $IMP." >&2
   fi
 
-  irdex_check_fix_hostname || return $?
+  case "$irdex_boot_phase" in
+    init-top ) irdex_"${irdex_boot_phase//-/_}"_prep || return $?;;
+  esac
   irdex_scan || return $?
 
   [ "$irdex_boot_phase" != init-bottom ] \
     || irdex_flag_once finally_= irdex_umount_all_mnt || return $?
+}
+
+
+irdex_init_top_prep () {
+  if [ -n "$irdex_init_delay" ]; then
+    # Use this if some essential hardware has a tendency to wake up late.
+    irdex_log D "init-top delay: $irdex_init_delay sec"
+    sleep "$irdex_init_delay"
+  fi
+
+  irdex_check_fix_hostname || return $?
 }
 
 
