@@ -58,6 +58,21 @@ irdex_prereqs () {
 }
 
 
+irdex_important_warning_box () {
+  echo
+  echo
+  echo '!! !! !! !! !! !! !! !! !! !! !! !! !! !! !! !! !! !! !! !! !! !! !!'
+  echo '!!'
+  printf '!!  %s\n' "$@"
+  echo '!!'
+  echo '!! !! !! !! !! !! !! !! !! !! !! !! !! !! !! !! !! !! !! !! !! !! !!'
+  echo
+  echo 'irdex will continue in 30 seconds.'
+  sleep 30
+  echo
+}
+
+
 irdex_set_flag () {
   mkdir -p -- "$irdex_flagdir"
   [ -z "$1" ] || date >"$irdex_flagdir/$1" || return $?
@@ -744,25 +759,16 @@ irdex_retryable () {
 
 
 irdex_boot_luks_lvm_by_keyfile () {
-  irdex_unlock_luks_lvm_by_keyfile "$@" || return $?
-  irdex_retryable 5 1s test -b "$ROOT" || return $?
-  irdex_actually_mount "$ROOT" "$rootmnt" || return $?
-  irdex_umount_all_mnt || return $?
+  irdex_important_warning_box \
+    'irdex boot_luks_lvm_by_keyfile is deprecated.' \
+    'Please switch to: irdex-luks unlock_by_keyfile /path/to/file boot'
 }
 
 
 irdex_unlock_luks_lvm_by_keyfile () {
-  local KEY_FILE="$1"; shift
-  case "$KEY_FILE" in
-    /dev/fd/[3-9]* | /dev/fd/[1-9][0-9]* )
-      irdex_log E "It's not reliable to pass $KEY_FILE as key file:" \
-        'lvm might consider extra file descriptors as accidentially leaked,' \
-        'and thus might flinch. Instead, use stdin ("-").';;
-  esac
-  cryptsetup open --type=luks --key-file "$KEY_FILE" "$@" \
-    -- "$irdex_lvm_disk" "$irdex_lvm_pv" || return $?
-  irdex_retryable 5 1s test -b /dev/mapper/"$irdex_lvm_pv" || return $?
-  lvm vgchange --activate y "$irdex_lvm_vg" || return $?
+  irdex_important_warning_box \
+    'irdex unlock_luks_lvm_by_keyfile is deprecated.' \
+    'Please switch to: irdex-luks unlock_by_keyfile /path/to/file'
 }
 
 
