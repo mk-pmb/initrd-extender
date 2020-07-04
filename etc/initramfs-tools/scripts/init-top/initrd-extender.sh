@@ -212,7 +212,8 @@ irdex_boot () {
   fi
 
   case "$irdex_boot_phase" in
-    init-top ) irdex_"${irdex_boot_phase//-/_}"_prep || return $?;;
+    init-top )
+      irdex_bootprep || return $?;;
   esac
   irdex_scan || return $?
 
@@ -221,7 +222,10 @@ irdex_boot () {
 }
 
 
-irdex_init_top_prep () {
+irdex_bootprep () { irdex_bootprep_"$(echo "$irdex_boot_phase" | tr - _)"; }
+
+
+irdex_bootprep_init_top () {
   if [ -n "$irdex_init_delay" ]; then
     # Use this if some essential hardware has a tendency to wake up late.
     irdex_log D "init-top delay: $irdex_init_delay sec"
