@@ -15,9 +15,17 @@ labelmount () {
   local MNTP="/mnt/$(echo "$LABEL" | tr A-Z a-z)"
   local DISK="$DDBL/$LABEL"
   [ -b "$DISK" ] || return 3$(echo "E: found no disk labeled '$LABEL'" >&2)
+
+  local M_OPT='defaults,noatime'
+  local USE_SUDO=
+  [ -n "$USER" ] || local USER="$(whoami)"
+  if [ "$USER" != root ]; then
+    USE_SUDO='sudo -E'
+    M_OPT="$M_OPT,uid=$USER,gid=adm"
+  fi
   mount | grep -qFe " on $MNTP type " && return 0
-  mkdir -p -- "$MNTP"
-  mount "$DISK" "$MNTP" -o defaults,noatime || return $?
+  $USE_SUDO mkdir -p -- "$MNTP"
+  $USE_SUDO mount "$DISK" "$MNTP" -o "$M_OPT" || return $?
 }
 
 
