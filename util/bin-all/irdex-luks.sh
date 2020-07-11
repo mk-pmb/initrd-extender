@@ -79,7 +79,7 @@ function irlux_base64key_read () {
       while [ "${ARG:-0}" -ge 1 ]; do
         (( ARG -= 1 ))
         LN=
-        IFS= read -rs LN
+        IFS= read -rs LN || break   # e.g. eof
         LN="${LN//$'\r'/}"
         case "$LN" in
           '' ) ;;
