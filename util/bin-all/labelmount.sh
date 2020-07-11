@@ -21,7 +21,7 @@ labelmount () {
   [ -n "$USER" ] || local USER="$(whoami)"
   if [ "$USER" != root ]; then
     USE_SUDO='sudo -E'
-    M_OPT="$M_OPT,uid=$USER,gid=adm"
+    # not supported by ext3 -> # M_OPT="$M_OPT,uid=$USER,gid=adm"
   fi
   mount | grep -qFe " on $MNTP type " && return 0
   $USE_SUDO mkdir -p -- "$MNTP"
