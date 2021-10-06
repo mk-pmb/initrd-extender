@@ -38,8 +38,8 @@ irdex_main () {
     nfs-premount
     local-premount
     nfs-bottom
-    local-bottom
     init-bottom
+    local-bottom
     ' | sed -nre 's~^\s+~~;/^[a-z-]+$/p'))"
 
   irdex_"$ACTION" "$@"; return $?
