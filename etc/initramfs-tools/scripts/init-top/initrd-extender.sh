@@ -430,14 +430,6 @@ irdex_parse_one_disk_spec () {
       SPEC="L:$irdex_esp_label";;
   esac
   case "$SPEC" in
-    ESP: )
-      if [ -z "$irdex_esp_label" ]; then
-        irdex_esp_label="$(echo "$irdex_host" | tr a-z A-Z)_ESP"
-        export irdex_esp_label
-      fi
-      SPEC="L:$irdex_esp_label";;
-  esac
-  case "$SPEC" in
     upper:* )
       # Help me configure hostname-based FAT labels in GRUB,
       # saving the extra `tr --set=UC_HOST --upcase "$hostname"`.
