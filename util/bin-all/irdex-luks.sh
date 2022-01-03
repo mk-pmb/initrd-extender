@@ -4,6 +4,7 @@
 
 function irlux_cli_prep () {
   export LANG{,UAGE}=en_US.UTF-8  # make error messages search engine-friendly
+  local DBGLV="${DEBUGLEVEL:-0}"
   [ -n "$irdex_lvm_disk" ] || local irdex_lvm_disk="${irdex_host}_luks"
   case "$irdex_lvm_disk" in
     /* ) ;;
@@ -22,12 +23,19 @@ function irlux_cli_prep () {
       *:* ) ARG="${OP#*:}";;
     esac
     OP="${OP%%:*}"
+    [ "$DBGLV" -ge 2 ] && echo "D: op='$OP', arg='$ARG'" >&2
     case "$OP" in
       cd | \
       eval ) "$OP" -- "$ARG";;
       * ) irlux_"$OP" "$@"; return $?;;
     esac
   done
+}
+
+
+function dbg_vdo () {
+  [ "$DBGLV" -ge "$1" ] && echo "D: run: ${*:2}" >&2
+  "${@:2}" || return $?$(echo "W: failed: ${*:2}, rv=$?" >&2)
 }
 
 
@@ -46,20 +54,29 @@ function irlux_unlock_by_keyfile () {
         'leaked, and thus might flinch. Instead, use stdin ("-").' >&2
       return 3;;
   esac
-  cryptsetup open --type=luks --key-file "$KEY_FILE" $irdex_luksopen_opt \
-    -- "$irdex_lvm_disk" "$irdex_lvm_pv" || return $?$(
-    echo "E: Unable to open disk '$irdex_lvm_disk' as '$irdex_lvm_pv'"\
-      "using key file '$KEY_FILE'." >&2)
-  irdex retryable 5 1s test -b /dev/mapper/"$irdex_lvm_pv" || return $?
-  lvm vgchange --activate y "$irdex_lvm_vg" || return $?
+  local CRY=(
+    cryptsetup
+    open
+    --type=luks
+    --key-file "$KEY_FILE"
+    $irdex_luksopen_opt
+    --
+    "$irdex_lvm_disk"
+    "$irdex_lvm_pv"
+    )
+  dbg_vdo 2 "${CRY[@]}" || return $?$(echo "E: Unable to open disk" \
+    "'$irdex_lvm_disk' as '$irdex_lvm_pv' using key file '$KEY_FILE'." >&2)
+  dbg_vdo 2 irdex retryable 5 1s test -b /dev/mapper/"$irdex_lvm_pv" \
+    || return $?
+  dbg_vdo 2 lvm vgchange --activate y "$irdex_lvm_vg" || return $?
 }
 
 
 function irlux_boot () {
-  irdex retryable 5 1s test -b "$ROOT" || return $?
-  irdex actually_mount "$ROOT" "$rootmnt" || return $?
+  dbg_vdo 2 irdex retryable 5 1s test -b "$ROOT" || return $?
+  dbg_vdo 2 irdex actually_mount "$ROOT" "$rootmnt" || return $?
   cd / || return $?
-  irdex umount_all_mnt || return $?
+  dbg_vdo 2 irdex umount_all_mnt || return $?
 }
 
 
@@ -76,6 +93,7 @@ function irlux_base64key_read () {
     blind ) IFS= read -p "$ARG" -rs ADD;;
     pipe:* )
       ARG="${ARG#*:}" # max line count
+      [ "$DBGLV" -ge 2 ] && echo "D: readling key from pipe, maxln=$ARG" >&2
       while [ "${ARG:-0}" -ge 1 ]; do
         (( ARG -= 1 ))
         LN=
@@ -94,7 +112,17 @@ function irlux_base64key_read () {
 }
 
 
+function irlux_base64key_checksum () {
+  local ALGO="${1:-sha256}"; shift
+  local CUTOFF="${1:-8}"; shift
+  local CKSUM="$(<<<"$KEY_BASE64" base64 -d | "${ALGO}"sum -b)"
+  [ -n "$CUTOFF" ] && CKSUM="${CKSUM:0:$CUTOFF}"
+  echo "D: key checksum ($ALGO): $CKSUM" >&2
+}
+
+
 function irlux_base64key_unlock () {
+  [ "$DBGLV" -ge 2 ] && irlux_base64key_checksum
   <<<"$KEY_BASE64" base64 -d | irlux_unlock_by_keyfile - || return $?
 }
 
