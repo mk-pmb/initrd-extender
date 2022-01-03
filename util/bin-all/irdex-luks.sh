@@ -27,7 +27,7 @@ function irlux_cli_prep () {
     case "$OP" in
       cd | \
       eval ) "$OP" -- "$ARG";;
-      * ) irlux_"$OP" "$@"; return $?;;
+      * ) irlux_"$OP" "$ARG" || return $?;;
     esac
   done
 }

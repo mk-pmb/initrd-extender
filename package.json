@@ -1,5 +1,5 @@
 { "name": "initrd-extender",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "description": "Dynamically add files and autorun scripts to your initramfs via kernel parameters.",
   "keywords": [
     "initramfs",
