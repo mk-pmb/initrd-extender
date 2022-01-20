@@ -18,10 +18,12 @@ labelmount () {
 
   local M_OPT='defaults,noatime'
   local USE_SUDO=
-  [ -n "$USER" ] || local USER="$(whoami)"
-  if [ "$USER" != root ] && sudo --version >/dev/null; then
-    USE_SUDO='sudo -E'
-    # not supported by ext3 -> # M_OPT="$M_OPT,uid=$USER,gid=adm"
+  if sudo --version >/dev/null 2>&1; then
+    [ -n "$USER" ] || local USER="$(whoami)"
+    if [ "$USER" != root ] && sudo --version >/dev/null; then
+      USE_SUDO='sudo -E'
+      # not supported by ext3 -> # M_OPT="$M_OPT,uid=$USER,gid=adm"
+    fi
   fi
   mount | grep -qFe " on $MNTP type " && return 0
   $USE_SUDO mkdir -p -- "$MNTP"
