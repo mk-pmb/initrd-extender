@@ -26,6 +26,8 @@ function irlux_cli_prep () {
     [ "$DBGLV" -ge 2 ] && echo "D: op='$OP', arg='$ARG'" >&2
     case "$OP" in
       cd | \
+      echo | \
+      sleep | \
       eval ) "$OP" -- "$ARG";;
       * ) irlux_"$OP" "$ARG" || return $?;;
     esac
