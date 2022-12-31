@@ -111,6 +111,7 @@ function irlux_base64key_read () {
   esac
   [ -n "$ADD" ] || return 0
   KEY_BASE64="$KEEP$ADD"
+  KEY_BASE64="${KEY_BASE64//[ #]/}"
 }
 
 
