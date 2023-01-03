@@ -413,6 +413,12 @@ irdex_unary_fallback () {
 lcbn () { basename -- "$1" | tr A-Z a-z; }
 
 
+irdex_mnt_esp_symlink () {
+  local LINK='/mnt/esp'
+  [ -e "$LINK" ] || [ -L "$LINK" ] || ln -s "$irdex_host"_esp "$LINK"
+}
+
+
 irdex_parse_one_disk_spec () {
   local SPEC="$1"; shift
   local ACTION="$1"; shift
@@ -426,6 +432,7 @@ irdex_parse_one_disk_spec () {
       if [ -z "$irdex_esp_label" ]; then
         irdex_esp_label="$(echo "$irdex_host" | tr a-z A-Z)_ESP"
         export irdex_esp_label
+        irdex_mnt_esp_symlink
       fi
       SPEC="L:$irdex_esp_label";;
   esac

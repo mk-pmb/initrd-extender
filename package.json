@@ -1,5 +1,5 @@
 { "name": "initrd-extender",
-  "version": "0.0.14",
+  "version": "0.1.0",
   "description": "Dynamically add files and autorun scripts to your initramfs via kernel parameters.",
   "keywords": [
     "initramfs",
@@ -20,5 +20,5 @@
   "private": true, "license": "ISC",
 
 
-  "npm vs. BOM = Unexpected token": "-*- coding: UTF-8 -*-"
+  "engines": { "busybox": ">=1.21.1" }
 }
