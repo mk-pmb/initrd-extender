@@ -5,7 +5,7 @@
 function copy_to_esp () {
   export LANG{,UAGE}=en_US.UTF-8  # make error messages search engine-friendly
   local SELFPATH="$(readlink -m "$BASH_SOURCE"/..)"
-  cd "$SELFPATH"/.. || return $?
+  cd -- "$SELFPATH"/.. || return $?
   busybox sh -n initrd-extender.sh || return $?
 
   local DEST_DISK_LABEL="$1"; shift
