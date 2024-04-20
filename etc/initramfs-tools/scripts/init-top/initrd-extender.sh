@@ -285,16 +285,33 @@ irdex_unfold_why_not_inside_initramfs () {
     '(initramfs) '* ) ;; # probably running inside rescue shell
     * ) WHY_NOT="$WHY_NOT,ps1";;
   esac
+  local UF='irdex_unfold_why_not_inside_initramfs__'
+  "$UF"rootfs_mounted
+  "$UF"selfpath || WHY_NOT="$WHY_NOT,selfpath"
+
+  WHY_NOT="${WHY_NOT#,}"
+  [ -n "$WHY_NOT" ] || return 0
+  echo "$WHY_NOT"
+  return 2
+}
+
+
+irdex_unfold_why_not_inside_initramfs__rootfs_mounted () {
+  [ -f /etc/casper.conf ] && case "$BOOT_IMAGE" in
+    '('*')/casper/vmlinuz' | \
+    iso: ) return 0;;
+  esac
+
   local ROOTFS_MNT="$(mount | sed -nre '
     s~^(\S+) on / type rootfs .*$~\1~p')"
   [ -n "$ROOTFS_MNT" ] || WHY_NOT="$WHY_NOT,rootfs"
   [ "$rootmnt" = '/root' ] || WHY_NOT="$WHY_NOT,rootmnt"
-  [ "$ORIG_ARG_ZERO" = /bin/irdex ] \
-    || [ -n "$SELF_IRD_SCRIPT" ] \
-    || WHY_NOT="$WHY_NOT,selfpath"
-  WHY_NOT="${WHY_NOT#,}"
-  [ -n "$WHY_NOT" ] || return 0
-  echo "$WHY_NOT"
+}
+
+
+irdex_unfold_why_not_inside_initramfs__selfpath () {
+  [ -n "$SELF_IRD_SCRIPT" ] && return 0
+  [ "$ORIG_ARG_ZERO" = /bin/irdex ] && return 0
   return 2
 }
 
