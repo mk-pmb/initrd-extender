@@ -98,6 +98,7 @@ irdex_flag_once () {
 
 irdex_hook_suggest_helpful_tools () {
   echo '
+    acpi
     agetty
     base64
     basename
